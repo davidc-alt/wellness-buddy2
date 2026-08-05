@@ -100,6 +100,24 @@ export default function PatientApp({
     if (!textToSend) setChatInput('');
   };
 
+  // Check persistent login on app mount
+  React.useEffect(() => {
+    try {
+      const savedPatientId = localStorage.getItem('wb2_active_patient_id');
+      if (savedPatientId) {
+        const match = patients.find(p => p.id === savedPatientId);
+        if (match) {
+          onSelectPatient(match.id);
+          setShowLoginModal(false);
+          return;
+        }
+      } else {
+        // First launch: show login modal
+        setShowLoginModal(true);
+      }
+    } catch (e) {}
+  }, []);
+
   const handlePatientLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginForm.name.trim() || !loginForm.dob.trim()) return;
@@ -109,11 +127,15 @@ export default function PatientApp({
       p.dob.trim() === loginForm.dob.trim()
     );
 
+    let activeId = '';
     if (existing) {
+      activeId = existing.id;
       onSelectPatient(existing.id);
     } else {
+      const newPId = `p-${Date.now()}`;
+      activeId = newPId;
       const newP = {
-        id: `p-${Date.now()}`,
+        id: newPId,
         name: loginForm.name,
         dob: loginForm.dob,
         email: `${loginForm.name.toLowerCase().replace(/\s+/g, '.')}@wellnessclient.com`,
@@ -148,8 +170,19 @@ export default function PatientApp({
       onAddPatient(newP);
     }
 
+    try {
+      localStorage.setItem('wb2_active_patient_id', activeId);
+    } catch (e) {}
+
     setShowLoginModal(false);
     setLoginForm({ name: '', dob: '' });
+  };
+
+  const handlePatientLogout = () => {
+    try {
+      localStorage.removeItem('wb2_active_patient_id');
+    } catch (e) {}
+    setShowLoginModal(true);
   };
 
   const handleTestNotification = () => {
@@ -197,8 +230,8 @@ export default function PatientApp({
         </div>
 
         <button
-          onClick={() => setShowLoginModal(true)}
-          title="Patient Switch / Login Profile"
+          onClick={handlePatientLogout}
+          title="Switch Patient Profile / Log Out"
           class="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-xs font-bold text-emerald-300 border border-slate-600 transition-all shadow-sm"
         >
           <UserCheck class="w-3.5 h-3.5" />
