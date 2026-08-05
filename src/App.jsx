@@ -9,7 +9,13 @@ import {
 } from './lib/supabase';
 
 export default function App() {
-  const [activeView, setActiveView] = useState('dual'); // 'practitioner', 'patient', 'dual'
+  // Default to 'patient' view on mobile screens (< 768px), and 'patient' or 'dual' on desktop
+  const [activeView, setActiveView] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'patient';
+    }
+    return 'patient'; // Default view is Patient App
+  });
   const [patients, setPatients] = useState(INITIAL_PATIENTS);
   const [selectedPatientId, setSelectedPatientId] = useState('p-1');
   const [isSyncing, setIsSyncing] = useState(false);

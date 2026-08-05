@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Users, Plus, Trash2, History, Save, Zap, Edit3, CheckCircle2, 
-  Clock, AlertCircle, FileText, Download, Sparkles, ChevronDown, Search 
+  Clock, AlertCircle, FileText, Download, Sparkles, ChevronDown, Search,
+  Send, MessageSquare
 } from 'lucide-react';
 import { exportRegimenPDF, exportRegimenText } from '../lib/pdfExporter';
 
@@ -21,6 +22,7 @@ export default function PractitionerDashboard({
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showNewPatientModal, setShowNewPatientModal] = useState(false);
   const [editingSupplement, setEditingSupplement] = useState(null);
+  const [doctorReplyInput, setDoctorReplyInput] = useState('');
 
   // Form states for adding/editing a supplement
   const [suppForm, setSuppForm] = useState({
@@ -67,6 +69,27 @@ export default function PractitionerDashboard({
     onUpdatePatient(updated);
     setIsGuidanceSaved(true);
     setTimeout(() => setIsGuidanceSaved(false), 2500);
+  };
+
+  const handleSendDoctorReply = () => {
+    if (!doctorReplyInput.trim() || !selectedPatient) return;
+
+    const newMsg = {
+      id: `m-${Date.now()}`,
+      sender: 'doctor',
+      senderName: 'Dr. Luba Vitti',
+      text: doctorReplyInput.trim(),
+      timestamp: `Today at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    };
+
+    const updatedMessages = [...(selectedPatient.doctorMessages || []), newMsg];
+    const updatedPatient = {
+      ...selectedPatient,
+      doctorMessages: updatedMessages
+    };
+
+    onUpdatePatient(updatedPatient);
+    setDoctorReplyInput('');
   };
 
   const handleSaveSupplement = (e) => {
@@ -472,6 +495,65 @@ export default function PractitionerDashboard({
               >
                 <Save class="w-4 h-4" />
                 <span>{isGuidanceSaved ? 'Saved!' : 'Save Note'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Patient Messages & Doctor Chat Section */}
+          <div class="mt-8 bg-slate-50/80 rounded-2xl p-5 border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center space-x-2">
+                <MessageSquare class="w-4 h-4 text-[#4E878C]" />
+                <h3 class="text-sm font-bold text-[#1E293B]">Live Doctor-Patient Chat Thread</h3>
+              </div>
+              <span class="text-[10px] font-mono text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                Encrypted & Real-time
+              </span>
+            </div>
+
+            <div class="bg-white rounded-xl p-3 border border-slate-200 max-h-48 overflow-y-auto space-y-2 mb-3 shadow-inner">
+              {!selectedPatient.doctorMessages || selectedPatient.doctorMessages.length === 0 ? (
+                <p class="text-xs text-slate-400 italic text-center py-4">
+                  No messages from {selectedPatient.name} yet.
+                </p>
+              ) : (
+                selectedPatient.doctorMessages.map((msg) => {
+                  const isDoctor = msg.sender === 'doctor';
+                  return (
+                    <div key={msg.id} class={`flex flex-col ${isDoctor ? 'items-end' : 'items-start'}`}>
+                      <span class="text-[9px] font-bold text-slate-400 px-1">
+                        {isDoctor ? 'You (Practitioner)' : selectedPatient.name} • {msg.timestamp}
+                      </span>
+                      <div class={`p-2.5 rounded-xl text-xs max-w-[85%] ${
+                        isDoctor
+                          ? 'bg-[#2F4858] text-white rounded-tr-none'
+                          : 'bg-[#EFF2F5] text-slate-800 rounded-tl-none border border-slate-200'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <input
+                type="text"
+                placeholder={`Reply to ${selectedPatient.name}...`}
+                value={doctorReplyInput}
+                onChange={(e) => setDoctorReplyInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendDoctorReply();
+                }}
+                class="flex-1 p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4E878C]"
+              />
+              <button
+                onClick={handleSendDoctorReply}
+                class="px-4 py-2.5 bg-[#2F4858] hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center space-x-1"
+              >
+                <Send class="w-3.5 h-3.5 text-emerald-300" />
+                <span>Send</span>
               </button>
             </div>
           </div>

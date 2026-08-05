@@ -72,6 +72,11 @@ export const INITIAL_PATIENTS = [
       { timestamp: 'Today at 7:02 AM', action: 'Took NAD+ Liposomal Concentrate' },
       { timestamp: 'Today at 8:15 AM', action: 'Took BPC-157 Oral Supplement' },
       { timestamp: 'Today at 12:45 PM', action: 'Took Liposomal Vitamin D3 + K2' }
+    ],
+    doctorMessages: [
+      { id: 'm-1', sender: 'doctor', senderName: 'Dr. Luba Vitti', text: 'Welcome to WellnessBuddy 2.0! I have prescribed your NAD+ and BPC-157 protocol.', timestamp: 'Yesterday at 09:00 AM' },
+      { id: 'm-2', sender: 'patient', senderName: 'James Bond', text: 'Thank you Dr. Vitti! Should I take the BPC-157 on an empty stomach?', timestamp: 'Yesterday at 10:15 AM' },
+      { id: 'm-3', sender: 'doctor', senderName: 'Dr. Luba Vitti', text: 'Yes, take BPC-157 on an empty stomach 30 mins before breakfast for optimal absorption.', timestamp: 'Yesterday at 10:20 AM' }
     ]
   },
   {
@@ -85,7 +90,7 @@ export const INITIAL_PATIENTS = [
     reportedSymptoms: 'Digestive Issues & Brain Fog',
     currentSupplements: 'None',
     guidanceNote: 'Waiting for your practitioner to prescribe your custom protocol.',
-    practitionerName: 'Luba Vitti',
+    practitionerName: 'Dr. Luba Vitti',
     adherenceRate: 0,
     activeStreak: 0,
     dosesCompletedToday: 0,
@@ -100,7 +105,10 @@ export const INITIAL_PATIENTS = [
       { day: 'M', completed: false, date: '2026-08-03' },
       { day: 'T', completed: false, date: '2026-08-04' }
     ],
-    historyLogs: []
+    historyLogs: [],
+    doctorMessages: [
+      { id: 'm-1', sender: 'doctor', senderName: 'Dr. Luba Vitti', text: 'Hello Peter! Please log in to complete your intake so I can prescribe your custom protocol.', timestamp: 'Yesterday at 11:00 AM' }
+    ]
   }
 ];
 

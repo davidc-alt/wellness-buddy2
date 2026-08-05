@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Pill, Sparkles, BarChart3, Package, Bell, Flame, CheckCircle, 
-  Hourglass, Check, Calendar, Download, RefreshCw, UserCheck, KeyRound, ShieldAlert 
+  Hourglass, Check, Calendar, Download, RefreshCw, UserCheck, KeyRound, 
+  Send, MessageSquare, Clock, ShieldCheck, HeartPulse, User
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { exportRegimenPDF, exportRegimenText } from '../lib/pdfExporter';
@@ -13,14 +14,22 @@ export default function PatientApp({
   onUpdatePatient, 
   onAddPatient 
 }) {
-  const [activeTab, setActiveTab] = useState('protocol'); // 'protocol', 'supplements', 'adherence', 'fullscript'
+  const [activeTab, setActiveTab] = useState('protocol'); // 'protocol', 'reminders', 'doctor', 'adherence', 'fullscript'
   const [notificationsAllowed, setNotificationsAllowed] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [loginForm, setLoginForm] = useState({ name: '', dob: '' });
+  const [chatInput, setChatInput] = useState('');
+  
+  // Custom Reminder Schedule Times
+  const [reminderTimes, setReminderTimes] = useState({
+    morning: '08:00 AM',
+    midday: '12:00 PM',
+    evening: '06:00 PM',
+    bedtime: '09:00 PM'
+  });
 
   const patient = patients.find(p => p.id === currentPatientId) || patients[0];
 
-  // Helper for greeting based on current time
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -36,7 +45,7 @@ export default function PatientApp({
         const nextState = !s.completedToday;
         if (nextState) {
           try {
-            confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 } });
+            confetti({ particleCount: 45, spread: 65, origin: { y: 0.75 } });
           } catch (e) {}
         }
         return { ...s, completedToday: nextState };
@@ -50,7 +59,6 @@ export default function PatientApp({
     const newStreak = isAllDone ? Math.max(patient.activeStreak || 0, 1) : patient.activeStreak;
     const newAdh = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-    // Add log item
     const toggledItem = updatedSupps.find(s => s.id === suppId);
     const newLog = {
       timestamp: `Today at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
@@ -70,11 +78,32 @@ export default function PatientApp({
     onUpdatePatient(updatedPatient);
   };
 
+  const handleSendDoctorMessage = (textToSend = null) => {
+    const msgText = textToSend || chatInput;
+    if (!msgText.trim() || !patient) return;
+
+    const newMsg = {
+      id: `m-${Date.now()}`,
+      sender: 'patient',
+      senderName: patient.name,
+      text: msgText.trim(),
+      timestamp: `Today at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    };
+
+    const updatedMessages = [...(patient.doctorMessages || []), newMsg];
+    const updatedPatient = {
+      ...patient,
+      doctorMessages: updatedMessages
+    };
+
+    onUpdatePatient(updatedPatient);
+    if (!textToSend) setChatInput('');
+  };
+
   const handlePatientLoginSubmit = (e) => {
     e.preventDefault();
     if (!loginForm.name.trim() || !loginForm.dob.trim()) return;
 
-    // Search if patient exists by DOB & Name
     const existing = patients.find(p => 
       p.name.toLowerCase().trim() === loginForm.name.toLowerCase().trim() ||
       p.dob.trim() === loginForm.dob.trim()
@@ -83,7 +112,6 @@ export default function PatientApp({
     if (existing) {
       onSelectPatient(existing.id);
     } else {
-      // Create new patient automatically and sync
       const newP = {
         id: `p-${Date.now()}`,
         name: loginForm.name,
@@ -95,7 +123,7 @@ export default function PatientApp({
         reportedSymptoms: 'New patient registration',
         currentSupplements: 'None',
         guidanceNote: 'Waiting for your practitioner to prescribe your custom protocol.',
-        practitionerName: 'Luba Vitti',
+        practitionerName: 'Dr. Luba Vitti',
         adherenceRate: 0,
         activeStreak: 0,
         dosesCompletedToday: 0,
@@ -112,6 +140,9 @@ export default function PatientApp({
         ],
         historyLogs: [
           { timestamp: 'Just now', action: 'Patient logged in & initialized intake' }
+        ],
+        doctorMessages: [
+          { id: 'm-1', sender: 'doctor', senderName: 'Dr. Luba Vitti', text: `Welcome ${loginForm.name}! I am reviewing your intake. Feel free to leave me a message here.`, timestamp: 'Just now' }
         ]
       };
       onAddPatient(newP);
@@ -121,96 +152,101 @@ export default function PatientApp({
     setLoginForm({ name: '', dob: '' });
   };
 
+  const handleTestNotification = () => {
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
+        new Notification('WellnessBuddy Dose Reminder 💊', {
+          body: `Hi ${patient ? patient.name : 'Patient'}! It is time for your scheduled supplement dose.`,
+          icon: '/favicon.ico'
+        });
+      } else {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('WellnessBuddy Reminders Enabled! 🔔', {
+              body: 'You will receive timely push alerts for your daily supplement protocol.'
+            });
+            setNotificationsAllowed(true);
+          }
+        });
+      }
+    } else {
+      alert('Dose Reminder: Time for your daily supplement dose!');
+    }
+  };
+
   const hasSupplements = patient && patient.supplements && patient.supplements.length > 0;
   const completedDoses = patient ? (patient.supplements || []).filter(s => s.completedToday).length : 0;
   const totalDoses = patient ? (patient.supplements || []).length : 0;
 
   return (
-    <div class="max-w-md mx-auto min-h-[750px] bg-[#F4F6F8] rounded-[40px] shadow-2xl border-[8px] border-slate-900 overflow-hidden flex flex-col font-sans relative my-4">
+    <div class="w-full max-w-lg mx-auto bg-[#F8FAFC] min-h-[760px] rounded-3xl sm:rounded-[36px] shadow-2xl border border-slate-200 overflow-hidden flex flex-col font-sans relative my-2">
       
-      {/* Dynamic Mobile Island / Notch */}
-      <div class="bg-black text-white px-6 pt-3 pb-2 flex items-center justify-between text-xs font-semibold select-none">
-        <span class="text-xs">8:40</span>
-        <div class="w-24 h-4 bg-black rounded-full border border-slate-800 flex items-center justify-center space-x-1">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+      {/* Mobile Top Header Banner */}
+      <div class="bg-[#2F4858] text-white px-5 pt-4 pb-3 flex items-center justify-between shadow-sm select-none">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-xl bg-[#4E878C] flex items-center justify-center text-sm font-bold shadow-inner">
+            💊
+          </div>
+          <div>
+            <h1 class="font-extrabold text-sm tracking-wide text-white">WellnessBuddy Patient App</h1>
+            <p class="text-[10px] text-emerald-300 font-medium flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              Live Connected w/ Doctor
+            </p>
+          </div>
         </div>
-        <div class="flex items-center space-x-1 text-[10px]">
-          <span>5G+</span>
-          <span class="bg-red-500 text-white text-[9px] px-1 rounded font-bold">14</span>
-        </div>
+
+        <button
+          onClick={() => setShowLoginModal(true)}
+          title="Patient Switch / Login Profile"
+          class="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-slate-700/80 hover:bg-slate-700 text-xs font-bold text-emerald-300 border border-slate-600 transition-all shadow-sm"
+        >
+          <UserCheck class="w-3.5 h-3.5" />
+          <span class="text-[11px]">{patient ? patient.name.split(' ')[0] : 'Profile'}</span>
+        </button>
       </div>
 
-      {/* Main Scrollable Content */}
-      <div class="flex-1 overflow-y-auto px-5 pt-4 pb-24">
+      {/* Main Scrollable App Container */}
+      <div class="flex-1 overflow-y-auto px-4 sm:px-5 pt-4 pb-24">
         
-        {/* Header Greeting Bar */}
-        <div class="flex items-start justify-between mb-4">
+        {/* Patient Greeting & Status Header */}
+        <div class="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-bold text-[#1E293B] tracking-tight">
+            <h2 class="text-xl font-bold text-[#1E293B] tracking-tight">
               {getGreeting()}, <br />
-              <span class="text-[#2F4858] font-extrabold">{patient ? patient.name : 'James Charles'}</span>
+              <span class="text-[#2F4858] font-extrabold">{patient ? patient.name : 'Patient'}</span>
             </h2>
-            <p class="text-xs font-semibold text-slate-400 mt-0.5">
-              DOB: {patient ? patient.dob : 'Test'}
+            <p class="text-[11px] font-semibold text-slate-400 mt-0.5">
+              DOB: {patient ? patient.dob : 'N/A'} • Goal: {patient ? patient.primaryGoal : 'Health Optimization'}
             </p>
           </div>
 
-          <button
-            onClick={() => setShowLoginModal(true)}
-            title="Patient Login / Switch Profile"
-            class="w-10 h-10 rounded-full bg-[#2F4858] text-white flex items-center justify-center shadow-md hover:bg-slate-700 transition-all border border-slate-600"
-          >
-            <UserCheck class="w-5 h-5 text-emerald-300" />
-          </button>
-        </div>
-
-        {/* Enable Notification Banner (matching IMG_9240.PNG) */}
-        <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 mb-4 flex items-center justify-between space-x-3">
-          <div class="flex items-center space-x-3">
-            <div class="w-10 h-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center flex-shrink-0">
-              <Bell class="w-5 h-5" />
-            </div>
-            <div>
-              <h4 class="font-bold text-xs text-slate-900 leading-tight">Enable Pill & Prescription Notifications</h4>
-              <p class="text-[10px] text-slate-400 mt-0.5 leading-snug">
-                Tap Allow to get push alerts when your medicine is due
-              </p>
-            </div>
+          <div class="text-right">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              {patient ? patient.status : 'Active'}
+            </span>
+            <p class="text-[10px] text-slate-400 mt-1 font-mono">
+              Dr. {patient ? patient.practitionerName || 'Luba Vitti' : 'Luba Vitti'}
+            </p>
           </div>
-
-          <button
-            onClick={() => {
-              setNotificationsAllowed(!notificationsAllowed);
-              if (!notificationsAllowed && 'Notification' in window) {
-                Notification.requestPermission();
-              }
-            }}
-            class={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex-shrink-0 ${
-              notificationsAllowed
-                ? 'bg-emerald-600 text-white'
-                : 'bg-[#2F4858] text-white hover:bg-slate-700'
-            }`}
-          >
-            {notificationsAllowed ? 'Allowed ✓' : 'Allow'}
-          </button>
         </div>
 
-        {/* Quick Stat Cards: Active Streak & Doses Completed (matching IMG_9240.PNG) */}
-        <div class="grid grid-cols-2 gap-3 mb-5">
-          <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+        {/* Quick Stat Bar: Active Streak & Doses Completed */}
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80 flex items-center justify-between">
             <div>
-              <span class="text-[10px] font-bold text-slate-400 block">Active Streak</span>
-              <span class="text-xl font-extrabold text-slate-900 mt-1 block">
-                {patient ? patient.activeStreak : 0} Days
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Streak</span>
+              <span class="text-lg font-extrabold text-slate-900 mt-0.5 block">
+                {patient ? patient.activeStreak : 0} Days 🔥
               </span>
             </div>
             <Flame class="w-6 h-6 text-sky-500 fill-sky-400" />
           </div>
 
-          <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 flex items-center justify-between">
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80 flex items-center justify-between">
             <div>
-              <span class="text-[10px] font-bold text-slate-400 block">Doses Completed</span>
-              <span class="text-xl font-extrabold text-slate-900 mt-1 block">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Today's Doses</span>
+              <span class="text-lg font-extrabold text-slate-900 mt-0.5 block">
                 {completedDoses} of {totalDoses}
               </span>
             </div>
@@ -218,172 +254,322 @@ export default function PatientApp({
           </div>
         </div>
 
-        {/* PRACTITIONER GUIDANCE Box (matching IMG_9240.PNG) */}
-        <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 mb-5">
-          <div class="flex items-center justify-between mb-1.5">
-            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-              PRACTITIONER GUIDANCE
-            </span>
-            <span class="text-[11px] font-semibold text-[#4E878C]">
-              Practitioner {patient ? patient.practitionerName || 'Luba Vitti' : 'Luba Vitti'}
-            </span>
-          </div>
-          <p class="text-xs italic text-slate-700 leading-relaxed font-medium">
-            "{patient ? patient.guidanceNote : 'Waiting for your practitioner to prescribe your custom protocol.'}"
-          </p>
-        </div>
-
-        {/* TAB 1: PROTOCOL VIEW */}
+        {/* TAB 1: PROTOCOL SCHEDULE & CHECKLIST */}
         {activeTab === 'protocol' && (
-          <div>
-            {!hasSupplements ? (
-              /* Waiting for Practitioner State (matching IMG_9240.PNG) */
-              <div class="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-200/80 my-4 flex flex-col items-center">
-                <div class="w-16 h-16 rounded-full bg-slate-100 text-[#4E878C] flex items-center justify-center mb-4 border border-slate-200">
-                  <Hourglass class="w-8 h-8 animate-pulse" />
-                </div>
-                <h3 class="text-lg font-bold text-slate-900 mb-2">Waiting for your Practitioner</h3>
-                <p class="text-xs text-slate-500 leading-relaxed max-w-xs">
-                  Your practitioner is reviewing your Date of Birth and health intake. Once your custom protocol is prescribed, your daily regimen, timing schedule, and reminders will pop up here live.
-                </p>
+          <div class="space-y-4">
+            
+            {/* PRACTITIONER GUIDANCE Banner */}
+            <div class="bg-gradient-to-br from-white to-sky-50/60 rounded-3xl p-4 shadow-sm border border-sky-100">
+              <div class="flex items-center justify-between mb-1.5">
+                <span class="text-[10px] font-extrabold uppercase tracking-wider text-[#4E878C]">
+                  PRACTITIONER GUIDANCE NOTE
+                </span>
+                <span class="text-[11px] font-bold text-[#2F4858]">
+                  Dr. {patient ? patient.practitionerName || 'Luba Vitti' : 'Luba Vitti'}
+                </span>
               </div>
-            ) : (
-              /* Active Daily Supplement Protocol Checklist */
-              <div class="space-y-3">
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Today's Regimen Schedule</h3>
-                  
-                  <div class="flex space-x-2">
-                    <button
-                      onClick={() => exportRegimenPDF(patient)}
-                      class="text-[11px] font-bold text-[#4E878C] bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg flex items-center gap-1"
-                    >
-                      <Download class="w-3 h-3" /> PDF
-                    </button>
-                    <button
-                      onClick={() => exportRegimenText(patient)}
-                      class="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg"
-                    >
-                      Text
-                    </button>
-                  </div>
-                </div>
-
-                {patient.supplements.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => handleToggleDose(s.id)}
-                    class={`p-4 rounded-3xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
-                      s.completedToday
-                        ? 'bg-emerald-50/80 border-emerald-300'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div class="flex items-center space-x-3.5 pr-2">
-                      <div class={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                        s.completedToday
-                          ? 'bg-emerald-600 border-emerald-600 text-white'
-                          : 'border-slate-300 bg-white'
-                      }`}>
-                        {s.completedToday && <Check class="w-4 h-4 stroke-[3]" />}
-                      </div>
-
-                      <div>
-                        <h4 class={`font-bold text-xs ${s.completedToday ? 'text-emerald-900 line-through' : 'text-slate-900'}`}>
-                          {s.name}
-                        </h4>
-                        <p class="text-[10px] text-slate-400 mt-0.5">
-                          {s.scheduledTime || 'Morning'} • {s.timing || 'Empty Stomach'}
-                        </p>
-                        <p class="text-[11px] italic text-slate-600 mt-1">
-                          "{s.instructions}"
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: SUPPLEMENTS HUB (matching IMG_9241.PNG) */}
-        {activeTab === 'supplements' && (
-          <div>
-            <div class="text-center mb-4">
-              <h3 class="text-lg font-bold text-slate-900">Supplements Hub</h3>
-            </div>
-
-            {/* Banner card */}
-            <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 mb-5">
-              <div class="flex items-center space-x-2 text-[#4E878C] font-bold text-base mb-1">
-                <Sparkles class="w-5 h-5 fill-[#4E878C]/20" />
-                <span>Supplements & Regimens</span>
-              </div>
-              <p class="text-xs text-slate-500 leading-snug">
-                Detailed breakdown of your custom supplement stack prescribed by your practitioner.
+              <p class="text-xs italic text-slate-700 leading-relaxed font-medium">
+                "{patient ? patient.guidanceNote : 'Waiting for doctor to update guidance.'}"
               </p>
             </div>
 
-            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-3">
-              PRESCRIBED SUPPLEMENT STACK
-            </span>
-
-            {!hasSupplements ? (
-              <div class="bg-white rounded-3xl p-6 text-center text-xs text-slate-400 border border-slate-200">
-                No supplements currently prescribed in your stack.
+            {/* Daily Supplement Checklist */}
+            <div>
+              <div class="flex items-center justify-between mb-2.5">
+                <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Today's Supplement Checklist</h3>
+                
+                <div class="flex space-x-1.5">
+                  <button
+                    onClick={() => exportRegimenPDF(patient)}
+                    class="text-[11px] font-bold text-[#4E878C] bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg flex items-center gap-1"
+                  >
+                    <Download class="w-3 h-3" /> PDF
+                  </button>
+                  <button
+                    onClick={() => exportRegimenText(patient)}
+                    class="text-[11px] font-bold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-lg"
+                  >
+                    Text
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div class="space-y-3">
-                {patient.supplements.map((s) => (
-                  <div key={s.id} class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200">
-                    <div class="flex items-start justify-between">
-                      <div>
-                        <h4 class="font-bold text-xs text-slate-900">{s.name}</h4>
-                        <p class="text-[10px] text-slate-400 mt-0.5">
-                          {s.manufacturer || 'Empower Pharma'} • {s.frequency}
-                        </p>
+
+              {!hasSupplements ? (
+                <div class="bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-200/80 my-2 flex flex-col items-center">
+                  <div class="w-14 h-14 rounded-full bg-slate-100 text-[#4E878C] flex items-center justify-center mb-3 border border-slate-200">
+                    <Hourglass class="w-7 h-7 animate-pulse" />
+                  </div>
+                  <h3 class="text-base font-bold text-slate-900 mb-1">Waiting for Doctor Prescription</h3>
+                  <p class="text-xs text-slate-500 leading-relaxed max-w-xs">
+                    Your practitioner is reviewing your intake. Once prescribed, your personalized supplement doses and times will display here.
+                  </p>
+                  <button
+                    onClick={() => setActiveTab('doctor')}
+                    class="mt-4 px-4 py-2 bg-[#2F4858] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                  >
+                    <MessageSquare class="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Message Dr. Vitti</span>
+                  </button>
+                </div>
+              ) : (
+                <div class="space-y-3">
+                  {patient.supplements.map((s) => (
+                    <div
+                      key={s.id}
+                      onClick={() => handleToggleDose(s.id)}
+                      class={`p-4 rounded-3xl border transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+                        s.completedToday
+                          ? 'bg-emerald-50/90 border-emerald-300'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div class="flex items-center space-x-3.5 pr-2">
+                        <div class={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          s.completedToday
+                            ? 'bg-emerald-600 border-emerald-600 text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}>
+                          {s.completedToday && <Check class="w-4 h-4 stroke-[3]" />}
+                        </div>
+
+                        <div>
+                          <h4 class={`font-bold text-xs ${s.completedToday ? 'text-emerald-900 line-through' : 'text-slate-900'}`}>
+                            {s.name}
+                          </h4>
+                          <p class="text-[10px] text-slate-400 mt-0.5 font-medium">
+                            ⏰ {s.scheduledTime || '08:00 AM'} • {s.timing || 'Empty Stomach'}
+                          </p>
+                          <p class="text-[11px] italic text-slate-600 mt-1">
+                            "{s.instructions}"
+                          </p>
+                        </div>
                       </div>
-                      <span class="bg-[#EFF2F5] text-slate-700 font-bold text-[10px] px-2.5 py-0.5 rounded-full border border-slate-300/60">
-                        {s.timing || 'Empty Stomach'}
+
+                      <span class={`text-[10px] font-bold px-2 py-1 rounded-full ${
+                        s.completedToday ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {s.completedToday ? 'Taken ✓' : 'Due'}
                       </span>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                    <div class="mt-2.5 bg-slate-50 rounded-xl p-2.5 text-[11px] italic text-slate-700 border border-slate-200/60">
-                      "{s.instructions}"
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         )}
 
-        {/* TAB 3: COMPLIANCE ANALYTICS / ADHERENCE (matching IMG_9242.PNG) */}
-        {activeTab === 'adherence' && (
-          <div>
-            <div class="text-center mb-4">
-              <h3 class="text-lg font-bold text-slate-900">Compliance Analytics</h3>
+        {/* TAB 2: REMINDERS & NOTIFICATION SCHEDULE */}
+        {activeTab === 'reminders' && (
+          <div class="space-y-4">
+            <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200">
+              <div class="flex items-center space-x-3 mb-3">
+                <div class="w-10 h-10 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center flex-shrink-0">
+                  <Bell class="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900">Dose Push Alerts & Reminders</h3>
+                  <p class="text-xs text-slate-500">Configure your daily supplement notifications</p>
+                </div>
+              </div>
+
+              <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200/80 mb-4 flex items-center justify-between">
+                <div>
+                  <span class="text-xs font-bold text-slate-800 block">Push Notifications</span>
+                  <span class="text-[10px] text-slate-400">
+                    {notificationsAllowed ? 'Enabled — Daily alerts active' : 'Click to enable local push reminders'}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleTestNotification}
+                  class={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                    notificationsAllowed
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#2F4858] text-white hover:bg-slate-700'
+                  }`}
+                >
+                  {notificationsAllowed ? 'Active ✓' : 'Enable'}
+                </button>
+              </div>
+
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
+                DAILY REMINDER TIME SLOTS
+              </span>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="p-3 bg-white border border-slate-200 rounded-2xl">
+                  <span class="text-[10px] font-bold text-slate-400 block">🌅 Morning Wake-Up</span>
+                  <input
+                    type="text"
+                    value={reminderTimes.morning}
+                    onChange={(e) => setReminderTimes({ ...reminderTimes, morning: e.target.value })}
+                    class="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg p-1.5 mt-1"
+                  />
+                </div>
+
+                <div class="p-3 bg-white border border-slate-200 rounded-2xl">
+                  <span class="text-[10px] font-bold text-slate-400 block">☀️ Midday / Lunch</span>
+                  <input
+                    type="text"
+                    value={reminderTimes.midday}
+                    onChange={(e) => setReminderTimes({ ...reminderTimes, midday: e.target.value })}
+                    class="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg p-1.5 mt-1"
+                  />
+                </div>
+
+                <div class="p-3 bg-white border border-slate-200 rounded-2xl">
+                  <span class="text-[10px] font-bold text-slate-400 block">🌇 Evening / Dinner</span>
+                  <input
+                    type="text"
+                    value={reminderTimes.evening}
+                    onChange={(e) => setReminderTimes({ ...reminderTimes, evening: e.target.value })}
+                    class="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg p-1.5 mt-1"
+                  />
+                </div>
+
+                <div class="p-3 bg-white border border-slate-200 rounded-2xl">
+                  <span class="text-[10px] font-bold text-slate-400 block">🌙 Bedtime</span>
+                  <input
+                    type="text"
+                    value={reminderTimes.bedtime}
+                    onChange={(e) => setReminderTimes({ ...reminderTimes, bedtime: e.target.value })}
+                    class="w-full text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg p-1.5 mt-1"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleTestNotification}
+                class="w-full mt-4 py-2.5 bg-[#4E878C] hover:bg-[#3B7A72] text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
+              >
+                <Bell class="w-3.5 h-3.5 text-emerald-200" />
+                <span>Test Dose Push Notification Now</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: CONNECT WITH DOCTOR / MESSAGING */}
+        {activeTab === 'doctor' && (
+          <div class="space-y-3">
+            {/* Doctor Profile Header */}
+            <div class="bg-[#2F4858] text-white rounded-3xl p-4 shadow-md flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <div class="w-11 h-11 rounded-2xl bg-[#4E878C] text-white flex items-center justify-center font-bold text-lg border border-emerald-400/40">
+                  🩺
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-white">Dr. {patient ? patient.practitionerName || 'Luba Vitti' : 'Luba Vitti'}</h3>
+                  <p class="text-[11px] text-emerald-300 font-medium flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Prescribing Practitioner • Online
+                  </p>
+                </div>
+              </div>
+
+              <span class="text-[10px] bg-slate-700 px-2.5 py-1 rounded-full text-slate-300 font-mono">Encrypted</span>
             </div>
 
-            {/* Dark Rate Card (matching IMG_9242.PNG) */}
-            <div class="bg-[#2F4858] text-white rounded-3xl p-6 shadow-md mb-5 relative overflow-hidden">
+            {/* Doctor Guidance Note Card */}
+            <div class="bg-amber-50 rounded-2xl p-3 border border-amber-200 text-xs">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 block mb-0.5">
+                CURRENT DOCTOR GUIDANCE NOTE
+              </span>
+              <p class="italic text-amber-900 font-medium">
+                "{patient ? patient.guidanceNote : 'No guidance note set.'}"
+              </p>
+            </div>
+
+            {/* Quick Action Preset Message Buttons */}
+            <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+              <button
+                onClick={() => handleSendDoctorMessage('Hi Dr. Vitti, I took my morning dose! Everything feels great.')}
+                class="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl whitespace-nowrap shadow-sm"
+              >
+                👍 Log Morning Dose
+              </button>
+              <button
+                onClick={() => handleSendDoctorMessage('Should I take my supplement before or after eating?')}
+                class="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl whitespace-nowrap shadow-sm"
+              >
+                ❓ Food Timing Question
+              </button>
+              <button
+                onClick={() => handleSendDoctorMessage('Requesting a quick protocol review for my current supplements.')}
+                class="px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold rounded-xl whitespace-nowrap shadow-sm"
+              >
+                📋 Protocol Review
+              </button>
+            </div>
+
+            {/* Chat Messages Thread */}
+            <div class="bg-white rounded-3xl p-4 border border-slate-200 min-h-[300px] max-h-[380px] overflow-y-auto space-y-3 flex flex-col justify-end shadow-inner">
+              {!patient || !patient.doctorMessages || patient.doctorMessages.length === 0 ? (
+                <div class="text-center text-xs text-slate-400 py-8 italic">
+                  No messages yet. Send a question to Dr. Vitti below!
+                </div>
+              ) : (
+                patient.doctorMessages.map((msg) => {
+                  const isDoctor = msg.sender === 'doctor';
+                  return (
+                    <div
+                      key={msg.id}
+                      class={`flex flex-col ${isDoctor ? 'items-start' : 'items-end'}`}
+                    >
+                      <span class="text-[10px] font-bold text-slate-400 mb-1 px-1">
+                        {isDoctor ? `Dr. ${patient.practitionerName || 'Luba Vitti'}` : 'You'} • {msg.timestamp}
+                      </span>
+                      <div class={`p-3 rounded-2xl text-xs max-w-[85%] leading-relaxed ${
+                        isDoctor
+                          ? 'bg-[#2F4858] text-white rounded-tl-none shadow-sm'
+                          : 'bg-[#4E878C] text-white rounded-tr-none shadow-sm'
+                      }`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Message Input Box */}
+            <div class="flex items-center space-x-2">
+              <input
+                type="text"
+                placeholder="Ask Dr. Vitti a question or symptom update..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSendDoctorMessage();
+                }}
+                class="flex-1 p-3 bg-white border border-slate-300 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#4E878C] shadow-sm"
+              />
+              <button
+                onClick={() => handleSendDoctorMessage()}
+                class="p-3 bg-[#2F4858] hover:bg-slate-700 text-white rounded-2xl shadow-sm transition-all flex-shrink-0"
+              >
+                <Send class="w-4 h-4 text-emerald-300" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: ADHERENCE ANALYTICS */}
+        {activeTab === 'adherence' && (
+          <div class="space-y-4">
+            <div class="bg-[#2F4858] text-white rounded-3xl p-5 shadow-md relative overflow-hidden">
               <span class="text-[10px] font-extrabold uppercase tracking-widest text-slate-300 block mb-1">
-                REGIMEN ADHERENCE RATE
+                YOUR ADHERENCE SCORE
               </span>
               <div class="flex items-baseline space-x-3">
                 <span class="text-4xl font-extrabold tracking-tight">
                   {patient ? patient.adherenceRate : 100}%
                 </span>
-                <span class="text-xs font-semibold text-emerald-400">Consistent</span>
+                <span class="text-xs font-semibold text-emerald-400">Consistent Compliance</span>
               </div>
 
-              {/* Flame icon */}
-              <div class="absolute right-5 top-5 w-12 h-12 rounded-full bg-slate-700/50 flex items-center justify-center">
-                <Flame class="w-6 h-6 text-sky-400 fill-sky-400" />
-              </div>
-
-              <div class="w-full bg-slate-700 h-1 rounded-full my-4 overflow-hidden">
+              <div class="w-full bg-slate-700 h-1.5 rounded-full my-4 overflow-hidden">
                 <div 
                   class="bg-sky-400 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${patient ? patient.adherenceRate : 100}%` }}
@@ -398,12 +584,11 @@ export default function PatientApp({
               </div>
             </div>
 
-            {/* 7-Day Visual Log Dots (matching IMG_9242.PNG) */}
-            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
               LAST 7 DAYS ADHERENCE LOG
             </span>
 
-            <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80 mb-5">
+            <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200/80">
               <div class="flex items-center justify-between text-center px-1">
                 {(patient ? patient.adherenceLog : [
                   { day: 'W', completed: true },
@@ -414,7 +599,7 @@ export default function PatientApp({
                   { day: 'M', completed: true },
                   { day: 'T', completed: true }
                 ]).map((log, idx) => (
-                  <div key={idx} class="flex flex-col items-center space-y-2">
+                  <div key={idx} class="flex flex-col items-center space-y-1.5">
                     <span class="text-xs font-bold text-slate-400">{log.day}</span>
                     <div class={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all ${
                       log.completed
@@ -428,9 +613,8 @@ export default function PatientApp({
               </div>
             </div>
 
-            {/* Recent Log History */}
-            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-2">
-              RECENT LOG HISTORY
+            <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+              RECENT DOSE LOG HISTORY
             </span>
 
             <div class="space-y-2">
@@ -450,32 +634,30 @@ export default function PatientApp({
           </div>
         )}
 
-        {/* TAB 4: FULLSCRIPT */}
+        {/* TAB 5: FULLSCRIPT & REGIMEN EXPORT */}
         {activeTab === 'fullscript' && (
-          <div>
-            <div class="text-center mb-4">
-              <h3 class="text-lg font-bold text-slate-900">Fullscript Supplement Portal</h3>
-            </div>
-
+          <div class="space-y-4">
             <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-200 text-center">
               <Package class="w-12 h-12 text-[#2F4858] mx-auto mb-3" />
               <h4 class="font-bold text-sm text-slate-900 mb-1">Refill Supplement Supply</h4>
               <p class="text-xs text-slate-500 mb-4">
-                Direct integration with your practitioner's Fullscript dispensary store for clinical grade ordering.
+                Clinical grade supplement ordering via your practitioner's Fullscript portal.
               </p>
               
-              <div class="space-y-2">
+              <div class="space-y-2.5">
                 <button
                   onClick={() => exportRegimenPDF(patient)}
-                  class="w-full py-3 bg-[#2F4858] hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all shadow-sm"
+                  class="w-full py-3 bg-[#2F4858] hover:bg-slate-700 text-white rounded-2xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
                 >
-                  Download Printable Regimen (PDF)
+                  <Download class="w-4 h-4 text-emerald-300" />
+                  <span>Download Printable PDF Regimen</span>
                 </button>
+
                 <button
                   onClick={() => exportRegimenText(patient)}
                   class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-2xl text-xs font-bold transition-all border border-slate-300"
                 >
-                  Export Formatted Text Summary
+                  Export Formatted Text Regimen
                 </button>
               </div>
             </div>
@@ -484,11 +666,11 @@ export default function PatientApp({
 
       </div>
 
-      {/* BOTTOM FLOATING NAVIGATION BAR (matching all 3 mobile screenshots!) */}
-      <div class="absolute bottom-3 left-4 right-4 bg-white/95 backdrop-blur-md rounded-3xl p-1.5 shadow-xl border border-slate-200/80 flex items-center justify-around z-30">
+      {/* BOTTOM PATIENT APP NAVIGATION BAR */}
+      <div class="absolute bottom-2 left-3 right-3 bg-white/95 backdrop-blur-md rounded-3xl p-1.5 shadow-xl border border-slate-200/90 flex items-center justify-around z-30">
         <button
           onClick={() => setActiveTab('protocol')}
-          class={`flex flex-col items-center py-2 px-3 rounded-2xl transition-all ${
+          class={`flex flex-col items-center py-1.5 px-2.5 rounded-2xl transition-all ${
             activeTab === 'protocol'
               ? 'bg-[#EFF2F5] text-[#2F4858] font-bold shadow-inner'
               : 'text-slate-400 hover:text-slate-600'
@@ -499,20 +681,35 @@ export default function PatientApp({
         </button>
 
         <button
-          onClick={() => setActiveTab('supplements')}
-          class={`flex flex-col items-center py-2 px-3 rounded-2xl transition-all ${
-            activeTab === 'supplements'
+          onClick={() => setActiveTab('reminders')}
+          class={`flex flex-col items-center py-1.5 px-2.5 rounded-2xl transition-all ${
+            activeTab === 'reminders'
               ? 'bg-[#EFF2F5] text-[#2F4858] font-bold shadow-inner'
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
-          <Sparkles class="w-5 h-5 mb-0.5" />
-          <span class="text-[10px]">Supplements</span>
+          <Bell class="w-5 h-5 mb-0.5" />
+          <span class="text-[10px]">Reminders</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('doctor')}
+          class={`flex flex-col items-center py-1.5 px-2.5 rounded-2xl transition-all relative ${
+            activeTab === 'doctor'
+              ? 'bg-[#EFF2F5] text-[#2F4858] font-bold shadow-inner'
+              : 'text-slate-400 hover:text-slate-600'
+          }`}
+        >
+          <MessageSquare class="w-5 h-5 mb-0.5" />
+          <span class="text-[10px]">Doctor</span>
+          {patient && patient.doctorMessages && patient.doctorMessages.length > 0 && (
+            <span class="absolute top-1 right-2 w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+          )}
         </button>
 
         <button
           onClick={() => setActiveTab('adherence')}
-          class={`flex flex-col items-center py-2 px-3 rounded-2xl transition-all ${
+          class={`flex flex-col items-center py-1.5 px-2.5 rounded-2xl transition-all ${
             activeTab === 'adherence'
               ? 'bg-[#EFF2F5] text-[#2F4858] font-bold shadow-inner'
               : 'text-slate-400 hover:text-slate-600'
@@ -524,27 +721,27 @@ export default function PatientApp({
 
         <button
           onClick={() => setActiveTab('fullscript')}
-          class={`flex flex-col items-center py-2 px-3 rounded-2xl transition-all ${
+          class={`flex flex-col items-center py-1.5 px-2.5 rounded-2xl transition-all ${
             activeTab === 'fullscript'
               ? 'bg-[#EFF2F5] text-[#2F4858] font-bold shadow-inner'
               : 'text-slate-400 hover:text-slate-600'
           }`}
         >
           <Package class="w-5 h-5 mb-0.5" />
-          <span class="text-[10px]">Fullscript</span>
+          <span class="text-[10px]">Refills</span>
         </button>
       </div>
 
-      {/* PATIENT LOGIN / INTAKE MODAL */}
+      {/* PATIENT LOGIN MODAL */}
       {showLoginModal && (
         <div class="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm p-6 flex items-center justify-center">
           <div class="bg-white rounded-3xl p-6 max-w-xs w-full shadow-2xl border border-slate-100 text-left">
             <div class="flex items-center space-x-2 text-[#2F4858] font-bold text-base mb-2">
               <KeyRound class="w-5 h-5 text-[#4E878C]" />
-              <span>Patient Login / Intake</span>
+              <span>Patient Profile Login</span>
             </div>
             <p class="text-xs text-slate-500 mb-4">
-              Enter your Name & Date of Birth to log into your profile or initialize a new intake.
+              Enter your Name & Date of Birth to log into your patient account.
             </p>
 
             <form onSubmit={handlePatientLoginSubmit} class="space-y-3 text-xs">
@@ -553,7 +750,7 @@ export default function PatientApp({
                 <input
                   type="text"
                   required
-                  placeholder="e.g. James Bond or peter c"
+                  placeholder="e.g. James Bond"
                   value={loginForm.name}
                   onChange={(e) => setLoginForm({ ...loginForm, name: e.target.value })}
                   class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#4E878C] focus:outline-none"
@@ -584,7 +781,7 @@ export default function PatientApp({
                   type="submit"
                   class="px-4 py-2 bg-[#2F4858] text-white font-bold rounded-xl text-xs shadow-sm"
                 >
-                  Log In & Sync
+                  Log In
                 </button>
               </div>
             </form>
