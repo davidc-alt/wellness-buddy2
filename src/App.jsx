@@ -9,8 +9,8 @@ import {
 } from './lib/supabase';
 
 export default function App() {
-  // Default to 'patient' mode for a native mobile experience
-  const [activeView, setActiveView] = useState('patient');
+  // Default to practitioner view for desktop web dashboard
+  const [activeView, setActiveView] = useState('practitioner');
   const [patients, setPatients] = useState(INITIAL_PATIENTS);
   const [selectedPatientId, setSelectedPatientId] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
