@@ -1,0 +1,107 @@
+[
+  {
+    "id": "cli_1785984922547",
+    "name": "David Bondarescu",
+    "dob": "1995-05-20",
+    "email": "david.bondarescu@wellnessclient.com",
+    "password": "password123",
+    "status": "Protocol Active",
+    "isNew": false,
+    "primaryGoal": "Optimize peak vitality & performance",
+    "reportedSymptoms": "None reported",
+    "currentSupplements": "None",
+    "guidanceNote": "Waiting for your practitioner to prescribe your custom protocol.",
+    "practitionerName": "Luba Vitti",
+    "adherenceRate": 100,
+    "activeStreak": 1,
+    "dosesCompletedToday": 1,
+    "totalDosesToday": 1,
+    "supplements": [
+      {
+        "id": "s-101",
+        "name": "NAD+ Liposomal Concentrate (2 sprays)",
+        "manufacturer": "Empower Pharma",
+        "brand": "Empower Pharma",
+        "category": "Supplement",
+        "frequency": "Daily at Morning Wake-Up",
+        "recurrence": "Every 24h",
+        "timing": "Empty Stomach",
+        "instructions": "Administer 1 spray per nostril on empty stomach immediately upon waking.",
+        "scheduledTime": "08:00 AM",
+        "completedToday": true,
+        "dosageValue": 2,
+        "dosageUnit": "sprays",
+        "timingSchedule": "Empty Stomach",
+        "frequencyDescription": "Daily at Morning Wake-Up",
+        "intervalHours": 24,
+        "practitionerNotes": "Administer 1 spray per nostril on empty stomach immediately upon waking.",
+        "totalServingsRemaining": 29,
+        "maxServings": 30,
+        "fullscriptRefillUrl": "https://us.fullscript.com/welcome/lvitti/signup"
+      }
+    ],
+    "adherenceLog": [
+      {
+        "day": "W",
+        "completed": false,
+        "date": "2026-07-29"
+      },
+      {
+        "day": "T",
+        "completed": false,
+        "date": "2026-07-30"
+      },
+      {
+        "day": "F",
+        "completed": false,
+        "date": "2026-07-31"
+      },
+      {
+        "day": "S",
+        "completed": false,
+        "date": "2026-08-01"
+      },
+      {
+        "day": "S",
+        "completed": false,
+        "date": "2026-08-02"
+      },
+      {
+        "day": "M",
+        "completed": false,
+        "date": "2026-08-03"
+      },
+      {
+        "day": "T",
+        "completed": false,
+        "date": "2026-08-04"
+      }
+    ],
+    "historyLogs": [
+      {
+        "timestamp": "Today at 07:55 PM",
+        "action": "Took NAD+ Liposomal Concentrate (2 sprays)"
+      },
+      {
+        "timestamp": "Just now",
+        "action": "Patient account registered via mobile app"
+      }
+    ],
+    "doctorMessages": [
+      {
+        "id": "m-1",
+        "sender": "doctor",
+        "senderName": "Dr. Luba Vitti",
+        "text": "Welcome David Bondarescu! I am reviewing your intake. Feel free to leave me a message here.",
+        "timestamp": "Just now"
+      },
+      {
+        "id": "m-1785984969050",
+        "sender": "client",
+        "senderName": "David Bondarescu",
+        "text": "Hi Dr. Vitti! When should I take my second dose?",
+        "timestamp": "Today at 07:56 PM"
+      }
+    ]
+  }
+]

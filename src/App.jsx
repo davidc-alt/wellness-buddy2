@@ -9,15 +9,10 @@ import {
 } from './lib/supabase';
 
 export default function App() {
-  // Default to 'patient' view on mobile screens (< 768px), and 'patient' or 'dual' on desktop
-  const [activeView, setActiveView] = useState(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 768) {
-      return 'patient';
-    }
-    return 'patient'; // Default view is Patient App
-  });
+  // Default to 'patient' mode for a native mobile experience
+  const [activeView, setActiveView] = useState('patient');
   const [patients, setPatients] = useState(INITIAL_PATIENTS);
-  const [selectedPatientId, setSelectedPatientId] = useState('p-1');
+  const [selectedPatientId, setSelectedPatientId] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState(null);
 
@@ -36,12 +31,11 @@ export default function App() {
     async function loadCloudData() {
       setIsSyncing(true);
       const cloudData = await fetchStateFromSupabase();
-      if (cloudData && Array.isArray(cloudData) && cloudData.length > 0) {
+      if (cloudData && Array.isArray(cloudData)) {
         setPatients(cloudData);
-        setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      } else {
-        // First run: Upload initial preloaded state
-        await saveStateToSupabase(INITIAL_PATIENTS);
+        if (cloudData.length > 0) {
+          setSelectedPatientId(prev => prev || cloudData[0].id);
+        }
         setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       }
       setIsSyncing(false);
@@ -54,18 +48,19 @@ export default function App() {
     const interval = setInterval(async () => {
       const remoteData = await fetchStateFromSupabase();
       if (remoteData && Array.isArray(remoteData)) {
-        // Compare stringified JSON to detect external updates
         if (JSON.stringify(remoteData) !== JSON.stringify(patients)) {
           setPatients(remoteData);
+          if (remoteData.length > 0 && (!selectedPatientId || !remoteData.some(p => p.id === selectedPatientId))) {
+            setSelectedPatientId(remoteData[0].id);
+          }
           setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
         }
       }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [patients]);
+  }, [patients, selectedPatientId]);
 
-  // Handler to update a single patient's record
   const handleUpdatePatient = (updatedPatient) => {
     const newPatientsList = patients.map(p => 
       p.id === updatedPatient.id ? updatedPatient : p
@@ -74,7 +69,6 @@ export default function App() {
     syncToCloud(newPatientsList);
   };
 
-  // Handler to add a new patient
   const handleAddPatient = (newPatient) => {
     const newPatientsList = [...patients, newPatient];
     setPatients(newPatientsList);
@@ -82,7 +76,6 @@ export default function App() {
     syncToCloud(newPatientsList);
   };
 
-  // Handler to delete a patient
   const handleDeletePatient = (patientId) => {
     const remaining = patients.filter(p => p.id !== patientId);
     setPatients(remaining);
@@ -105,59 +98,52 @@ export default function App() {
   };
 
   return (
-    <div class="min-h-screen flex flex-col bg-[#F4F6F8]">
+    <div class="min-h-screen bg-[#F4F6F8] flex flex-col font-sans">
       
-      {/* Top Navbar */}
-      <Navbar 
-        activeView={activeView}
-        setActiveView={setActiveView}
-        isSyncing={isSyncing}
-        onManualSync={handleManualSync}
-        lastSyncedTime={lastSyncedTime}
-      />
+      {/* Show Top Web Navbar ONLY when in Practitioner or Dual Mode */}
+      {activeView !== 'patient' && (
+        <Navbar 
+          activeView={activeView}
+          setActiveView={setActiveView}
+          isSyncing={isSyncing}
+          onManualSync={handleManualSync}
+          lastSyncedTime={lastSyncedTime}
+        />
+      )}
 
-      {/* Main Views Container */}
-      <main class="flex-1 p-2 sm:p-4 lg:p-6">
+      {/* Main Container */}
+      <main class="flex-1 w-full">
         
-        {/* VIEW 1: PRACTITIONER WEBSITE ONLY */}
-        {activeView === 'practitioner' && (
-          <PractitionerDashboard 
+        {/* VIEW 1: NATIVE PATIENT APP (PURE MOBILE EXPERIENCE, ZERO WEB WRAPPER) */}
+        {activeView === 'patient' && (
+          <PatientApp 
             patients={patients}
-            selectedPatientId={selectedPatientId}
+            currentPatientId={selectedPatientId}
             onSelectPatient={setSelectedPatientId}
             onUpdatePatient={handleUpdatePatient}
             onAddPatient={handleAddPatient}
-            onDeletePatient={handleDeletePatient}
+            onSwitchToPractitioner={() => setActiveView('practitioner')}
           />
         )}
 
-        {/* VIEW 2: PATIENT APP ONLY */}
-        {activeView === 'patient' && (
-          <div class="py-4">
-            <PatientApp 
+        {/* VIEW 2: PRACTITIONER WEBSITE ONLY (DESKTOP VIEW) */}
+        {activeView === 'practitioner' && (
+          <div class="p-4 sm:p-6 lg:p-8">
+            <PractitionerDashboard 
               patients={patients}
-              currentPatientId={selectedPatientId}
+              selectedPatientId={selectedPatientId}
               onSelectPatient={setSelectedPatientId}
               onUpdatePatient={handleUpdatePatient}
               onAddPatient={handleAddPatient}
+              onDeletePatient={handleDeletePatient}
             />
           </div>
         )}
 
-        {/* VIEW 3: DUAL LIVE VIEW (SIDE-BY-SIDE FOR LIVE TESTING) */}
+        {/* VIEW 3: DUAL LIVE VIEW (FOR SIDE-BY-SIDE TESTING) */}
         {activeView === 'dual' && (
-          <div class="max-w-[1600px] mx-auto grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-            
-            {/* Left 7 columns: Practitioner Website */}
+          <div class="max-w-[1600px] mx-auto p-4 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             <div class="xl:col-span-7">
-              <div class="bg-white rounded-2xl p-2 mb-3 border border-slate-200 shadow-sm flex items-center justify-between px-4 text-xs font-bold text-slate-700">
-                <span class="flex items-center gap-1.5">
-                  <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                  Practitioner Live Dashboard
-                </span>
-                <span class="text-slate-400 font-mono text-[11px]">Syncing with Supabase Bucket</span>
-              </div>
-              
               <PractitionerDashboard 
                 patients={patients}
                 selectedPatientId={selectedPatientId}
@@ -167,35 +153,32 @@ export default function App() {
                 onDeletePatient={handleDeletePatient}
               />
             </div>
-
-            {/* Right 5 columns: Patient App Mobile Device Mockup */}
             <div class="xl:col-span-5 flex flex-col items-center">
-              <div class="w-full bg-white rounded-2xl p-2 mb-3 border border-slate-200 shadow-sm flex items-center justify-between px-4 text-xs font-bold text-slate-700 max-w-md">
-                <span class="flex items-center gap-1.5">
-                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                  Patient App Device Preview
-                </span>
-                <span class="text-slate-400 font-mono text-[11px]">Instant Live Sync</span>
+              <div class="w-full max-w-md bg-white rounded-2xl p-2 mb-3 border border-slate-200 shadow-sm flex items-center justify-between px-4 text-xs font-bold text-slate-700">
+                <span>Patient App Preview</span>
+                <span class="text-emerald-600">Live Sync Active</span>
               </div>
-
-              <PatientApp 
-                patients={patients}
-                currentPatientId={selectedPatientId}
-                onSelectPatient={setSelectedPatientId}
-                onUpdatePatient={handleUpdatePatient}
-                onAddPatient={handleAddPatient}
-              />
+              <div class="w-full max-w-md rounded-[36px] overflow-hidden border-[8px] border-slate-900 shadow-2xl bg-white min-h-[750px]">
+                <PatientApp 
+                  patients={patients}
+                  currentPatientId={selectedPatientId}
+                  onSelectPatient={setSelectedPatientId}
+                  onUpdatePatient={handleUpdatePatient}
+                  onAddPatient={handleAddPatient}
+                />
+              </div>
             </div>
-
           </div>
         )}
 
       </main>
 
-      {/* Footer */}
-      <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400 font-medium">
-        WellnessBuddy Encrypted Prescription & Compliance System • Powered by Supabase Storage & AES-256 Client Security
-      </footer>
+      {/* Footer shown ONLY in Practitioner or Dual Mode */}
+      {activeView !== 'patient' && (
+        <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs text-slate-400 font-medium">
+          WellnessBuddy Encrypted Prescription & Compliance System • Powered by Supabase Storage
+        </footer>
+      )}
 
     </div>
   );

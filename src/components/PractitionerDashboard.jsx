@@ -45,7 +45,8 @@ export default function PractitionerDashboard({
     currentSupplements: 'Multivitamin'
   });
 
-  const selectedPatient = patients.find(p => p.id === selectedPatientId) || patients[0];
+  // Fallback selectedPatient calculation
+  const selectedPatient = patients.find(p => p.id === selectedPatientId) || (patients.length > 0 ? patients[0] : null);
 
   // Keep guidance text in sync with selected patient
   React.useEffect(() => {
@@ -286,10 +287,6 @@ export default function PractitionerDashboard({
     });
   };
 
-  if (!selectedPatient) {
-    return <div class="p-8 text-center text-slate-500">No patient selected. Please register a patient.</div>;
-  }
-
   return (
     <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 font-sans">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -318,13 +315,15 @@ export default function PractitionerDashboard({
           </div>
 
           {/* Selected Patient Dropdown Card */}
-          <div class="mb-4 bg-slate-100/90 rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer shadow-inner">
-            <div class="truncate">
-              <span>{selectedPatient.name}</span>
-              <span class="font-normal text-slate-500 ml-1">(DOB: {selectedPatient.dob}) — {selectedPatient.adherenceRate}% Adh</span>
+          {selectedPatient && (
+            <div class="mb-4 bg-slate-100/90 rounded-2xl p-3.5 border border-slate-200 flex items-center justify-between text-xs font-bold text-slate-800 cursor-pointer shadow-inner">
+              <div class="truncate">
+                <span>{selectedPatient.name}</span>
+                <span class="font-normal text-slate-500 ml-1">(DOB: {selectedPatient.dob}) — {selectedPatient.adherenceRate}% Adh</span>
+              </div>
+              <ChevronDown class="w-4 h-4 text-slate-500 flex-shrink-0 ml-2" />
             </div>
-            <ChevronDown class="w-4 h-4 text-slate-500 flex-shrink-0 ml-2" />
-          </div>
+          )}
 
           {/* Patient Roster List */}
           <div class="space-y-3 max-h-[550px] overflow-y-auto pr-1">
@@ -407,7 +406,25 @@ export default function PractitionerDashboard({
         </div>
 
         {/* RIGHT COLUMN: Patient Main Workspace (matching IMG_9243.PNG main panel) */}
-        <div class="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
+        {!selectedPatient ? (
+          <div class="lg:col-span-8 bg-white rounded-3xl p-8 text-center shadow-sm border border-slate-200/80 flex flex-col items-center justify-center min-h-[450px]">
+            <div class="w-16 h-16 rounded-full bg-slate-100 text-[#4E878C] flex items-center justify-center mb-4 border border-slate-200">
+              <Users class="w-8 h-8" />
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">No Active Patients in Roster</h3>
+            <p class="text-xs text-slate-500 max-w-md mx-auto leading-relaxed mb-6">
+              When patients log in or register on their mobile app, they will automatically sync and appear here in real time. You can also click "+ Register New Patient" below to manually add a patient.
+            </p>
+            <button
+              onClick={() => setShowNewPatientModal(true)}
+              class="px-6 py-3 bg-[#4E878C] hover:bg-[#3B7A72] text-white rounded-2xl font-bold text-xs inline-flex items-center space-x-2 transition-all shadow-sm"
+            >
+              <Plus class="w-4 h-4" />
+              <span>Register New Patient</span>
+            </button>
+          </div>
+        ) : (
+          <div class="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-200/80">
           
           {/* Header Row: Patient Info + Action Buttons */}
           <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-5 gap-4">
@@ -663,10 +680,9 @@ export default function PractitionerDashboard({
             )}
 
           </div>
-
         </div>
-
-      </div>
+      )}
+    </div>
 
       {/* MODAL: ADD / EDIT SUPPLEMENT */}
       {showAddModal && (
