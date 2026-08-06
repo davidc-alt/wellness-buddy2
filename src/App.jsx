@@ -48,18 +48,21 @@ export default function App() {
     const interval = setInterval(async () => {
       const remoteData = await fetchStateFromSupabase();
       if (remoteData && Array.isArray(remoteData)) {
-        if (JSON.stringify(remoteData) !== JSON.stringify(patients)) {
-          setPatients(remoteData);
-          if (remoteData.length > 0 && (!selectedPatientId || !remoteData.some(p => p.id === selectedPatientId))) {
-            setSelectedPatientId(remoteData[0].id);
+        setPatients(prevPatients => {
+          if (JSON.stringify(remoteData) !== JSON.stringify(prevPatients)) {
+            if (remoteData.length > 0 && (!selectedPatientId || !remoteData.some(p => p.id === selectedPatientId))) {
+              setSelectedPatientId(remoteData[0].id);
+            }
+            setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            return remoteData;
           }
-          setLastSyncedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        }
+          return prevPatients;
+        });
       }
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [patients, selectedPatientId]);
+  }, [selectedPatientId]);
 
   const handleUpdatePatient = (updatedPatient) => {
     const newPatientsList = patients.map(p => 
